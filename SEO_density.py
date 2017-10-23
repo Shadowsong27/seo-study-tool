@@ -17,7 +17,7 @@ def parse_page(filename,page):
 
     combined_result = []
 
-    search_results = soup.find_all('div',{'class':'g'})
+    search_results = soup.find_all('div', {'class': 'g'})
     position = 0
     for search_result in search_results:
         

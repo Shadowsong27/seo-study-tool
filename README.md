@@ -24,3 +24,6 @@ In our case we will use Google as an example. The output of the file, would be a
 14. domain_score
 15. trust_score
 
+# Problems found previously
+
+keyword needs to be lowered
