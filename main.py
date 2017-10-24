@@ -4,12 +4,13 @@ from common import initialise_selenium_chrome
 from selenium.webdriver.common.keys import Keys
 from nltk.stem.wordnet import WordNetLemmatizer
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
-import pandas
+
 import time
 import re
+import csv
 
 
 class Controller:
@@ -23,7 +24,7 @@ class Controller:
 
     def run(self):
         """
-        output a csv file contained all top 100 websites data related to the given
+        output a csv file contained all top 400 websites data related to the given
         keyword
         :return:
         """
@@ -65,10 +66,19 @@ class Controller:
                 }
 
                 # parsing
-                result_meta_element, result_title, result_url = self.parse_html(web_page)
-                
+                try:
+                    result_meta_element, result_title, result_url = self.parse_html(web_page)
+                except:
+                    position_tracker += 1
+                    continue
+
                 # calculation and processing
-                title_flag, title_density = self.cal_title_flag_and_density(result_title)
+                try:
+                    title_flag, title_density = self.cal_title_flag_and_density(result_title)
+                except ZeroDivisionError:
+                    position_tracker += 1
+                    continue
+
                 url_flag, url_density = self.cal_url_flag_and_density(result_url)
                 meta_flag, meta_density = self.cal_meta_flag_and_density(result_meta_element)
 
@@ -98,9 +108,8 @@ class Controller:
         for data_object in self.result:
             self.extract_sem_rush(data_object)
 
-        import csv
         keys = self.result[0].keys()
-        with open('people.csv', 'w') as output_file:
+        with open('{}.csv'.format(self.keyword), 'w') as output_file:
             dict_writer = csv.DictWriter(output_file, keys)
             dict_writer.writeheader()
             dict_writer.writerows(self.result)
@@ -114,15 +123,21 @@ class Controller:
         # check for loading
         while 1:
             try:
-                WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, 'ba-counter--mLdutJsWNCeLO46znAe6s')))
+                WebDriverWait(self.driver, 3).until(
+                    ec.presence_of_element_located((By.CLASS_NAME, 'ba-counter--mLdutJsWNCeLO46znAe6s')))
                 break
             except TimeoutException:
-                continue
+                try:
+                    WebDriverWait(self.driver, 3).until(
+                        ec.presence_of_element_located((By.CLASS_NAME, 's-h4')))
+                    return data_object
+                except TimeoutException:
+                    continue
 
         inner_html = self.driver.execute_script("return document.body.innerHTML")
 
         soup = BeautifulSoup(inner_html, "lxml")
+
         score_count_elements = soup.find_all("div", {"class": "ba-counter--mLdutJsWNCeLO46znAe6s"})
 
         try:
@@ -184,5 +199,5 @@ class Controller:
 
 
 if __name__ == '__main__':
-    Controller("big data startup Singapore").run()
+    Controller("old chengdu sichuan singapore").run()
 
