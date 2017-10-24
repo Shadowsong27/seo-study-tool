@@ -1,14 +1,13 @@
-from urllib import request, parse
+from urllib import parse
 from bs4 import BeautifulSoup
 from common import initialise_selenium_chrome
 from selenium.webdriver.common.keys import Keys
 from nltk.stem.wordnet import WordNetLemmatizer
-from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
-
+import pandas
 import time
 import re
 
@@ -31,7 +30,7 @@ class Controller:
         # open google, find top 100 sites html and parse
         self.driver.get("http://www.google.com")
 
-        if "Our system" in self.driver.page_source:
+        if "Our system" in self.driver.page_source:  # manually input CAPTCHA if encountered one
             time.sleep(30)
 
         search_bar = self.driver.find_element_by_id("lst-ib")
@@ -45,7 +44,26 @@ class Controller:
             search_results = self.driver.find_elements_by_class_name("g")
 
             for web_page in search_results:
-                
+
+                # package
+                current_data_object = {
+                    "ranking": None,
+                    "title": None,
+                    "url": None,
+                    "meta": None,
+                    "title_flag": None,
+                    "title_density": None,
+                    "url_flag": None,
+                    "url_density": None,
+                    "meta_flag": None,
+                    "meta_density": None,
+                    "backlinks_count": None,
+                    "ip_count": None,
+                    "domain_count": None,
+                    "domain_score": None,
+                    "trust_score": None
+                }
+
                 # parsing
                 result_meta_element, result_title, result_url = self.parse_html(web_page)
                 
@@ -57,19 +75,17 @@ class Controller:
                 position = position_tracker
                 position_tracker += 1
 
-                # package
-                current_data_object = {
-                    "ranking": position,
-                    "title": result_title,
-                    "url": result_url,
-                    "meta": result_meta_element.text,
-                    "title_flag": title_flag,
-                    "title_density": title_density,
-                    "url_flag": url_flag,
-                    "url_density": url_density,
-                    "meta_flag": meta_flag,
-                    "meta_density": meta_density
-                }
+                current_data_object["ranking"] = position
+                current_data_object["title"] = result_title
+                current_data_object["url"] = result_url
+                current_data_object["meta"] = result_meta_element.text
+                current_data_object["title_flag"] = title_flag
+                current_data_object["title_density"] = title_density
+                current_data_object["url_flag"] = url_flag
+                current_data_object["url_density"] = url_density
+                current_data_object["meta_flag"] = meta_flag
+                current_data_object["meta_density"] = meta_density
+
                 self.result.append(current_data_object)
 
             # navigate to next page
@@ -82,6 +98,13 @@ class Controller:
         for data_object in self.result:
             self.extract_sem_rush(data_object)
 
+        import csv
+        keys = self.result[0].keys()
+        with open('people.csv', 'w') as output_file:
+            dict_writer = csv.DictWriter(output_file, keys)
+            dict_writer.writeheader()
+            dict_writer.writerows(self.result)
+
     def extract_sem_rush(self, data_object):
 
         url = "https://www.semrush.com/analytics/backlinks/overview/{}:domain".format(parse.quote(data_object["url"],
@@ -91,7 +114,8 @@ class Controller:
         # check for loading
         while 1:
             try:
-                WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'ba-counter--mLdutJsWNCeLO46znAe6s')))
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, 'ba-counter--mLdutJsWNCeLO46znAe6s')))
                 break
             except TimeoutException:
                 continue
