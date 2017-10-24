@@ -3,20 +3,14 @@ from bs4 import BeautifulSoup
 from common import initialise_selenium_chrome
 from selenium.webdriver.common.keys import Keys
 from nltk.stem.wordnet import WordNetLemmatizer
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException
 
 import time
 import re
-
-
-# url = "https://www.semrush.com/analytics/backlinks/overview/http%3A%2F%2Facjc.moe.edu.sg:domain"
-#
-# driver.get(url)
-# inner_html = driver.execute_script("return document.body.innerHTML")
-# print(inner_html)
-
-# content = request.urlopen(req).read().decode("utf-8")
-# soup = BeautifulSoup(content, "lxml")
-# print(soup)
 
 
 class Controller:
@@ -36,6 +30,9 @@ class Controller:
         """
         # open google, find top 100 sites html and parse
         self.driver.get("http://www.google.com")
+
+        if "Our system" in self.driver.page_source:
+            time.sleep(30)
 
         search_bar = self.driver.find_element_by_id("lst-ib")
         search_bar.send_keys(self.keyword)
@@ -73,7 +70,6 @@ class Controller:
                     "meta_flag": meta_flag,
                     "meta_density": meta_density
                 }
-
                 self.result.append(current_data_object)
 
             # navigate to next page
@@ -83,10 +79,40 @@ class Controller:
                     a_tag.click()
                     break
 
-            # store in JSON
-            # open semrush iterate through the top 100 websites
-            # get data and append in JSON
-            # convert to pandas dataframe and output as csv
+        for data_object in self.result:
+            self.extract_sem_rush(data_object)
+
+    def extract_sem_rush(self, data_object):
+
+        url = "https://www.semrush.com/analytics/backlinks/overview/{}:domain".format(parse.quote(data_object["url"],
+                                                                                                  safe=''))
+        self.driver.get(url)
+
+        # check for loading
+        while 1:
+            try:
+                WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'ba-counter--mLdutJsWNCeLO46znAe6s')))
+                break
+            except TimeoutException:
+                continue
+
+        inner_html = self.driver.execute_script("return document.body.innerHTML")
+
+        soup = BeautifulSoup(inner_html, "lxml")
+        score_count_elements = soup.find_all("div", {"class": "ba-counter--mLdutJsWNCeLO46znAe6s"})
+
+        try:
+            backlinks_count, ip_count, domain_count, domain_score, trust_score = \
+                list(map(lambda x: x.text.strip(), score_count_elements))
+        except ValueError:
+            return data_object
+
+        data_object["backlinks_count"] = backlinks_count
+        data_object["ip_count"] = ip_count
+        data_object["domain_count"] = domain_count
+        data_object["domain_score"] = domain_score
+        data_object["trust_score"] = trust_score
+        return data_object
 
     @staticmethod
     def parse_html(web_page):
